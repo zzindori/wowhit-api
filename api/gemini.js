@@ -8,9 +8,13 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  const model = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
+  const appId = (req.headers['x-app-id'] || '').toUpperCase();
+  const apiKey = process.env[`GEMINI_API_KEY_${appId}`] || process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    return res.status(400).json({ error: `No API key for app: ${appId}` });
+  }
 
+  const model = req.headers['x-model'] || process.env.GEMINI_MODEL || 'gemini-3.5-flash';
   const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   try {
