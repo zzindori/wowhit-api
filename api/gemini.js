@@ -9,12 +9,18 @@ export default async function handler(req, res) {
   }
 
   const appId = (req.headers['x-app-id'] || '').toUpperCase();
-  const apiKey = process.env[`GEMINI_API_KEY_${appId}`] || process.env.GEMINI_API_KEY;
+  const userApiKey = req.body?.userApiKey;
+  const apiKey = userApiKey || process.env[`GEMINI_API_KEY_${appId}`] || process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return res.status(400).json({ error: `No API key for app: ${appId}` });
   }
 
-  const model = req.headers['x-model'] || process.env.GEMINI_MODEL || 'gemini-3.5-flash';
+  // Strip userApiKey from body before forwarding to Gemini
+  if (userApiKey && req.body) {
+    delete req.body.userApiKey;
+  }
+
+  const model = req.headers['x-model'] || process.env.GEMINI_MODEL || 'gemini-2.5-flash';
   const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   try {
