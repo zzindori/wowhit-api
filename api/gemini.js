@@ -16,9 +16,14 @@ export default async function handler(req, res) {
   }
 
   // Strip userApiKey from body before forwarding to Gemini
-  if (userApiKey && req.body) {
-    delete req.body.userApiKey;
-  }
+  const body = { ...req.body };
+  delete body.userApiKey;
+
+  // thinking 모델 대응: thinkingBudget=0 강제 주입 (토큰 절약 + 응답 잘림 방지)
+  body.generationConfig = {
+    ...(body.generationConfig || {}),
+    thinkingConfig: { thinkingBudget: 0 },
+  };
 
   const model = req.headers['x-model'] || process.env.GEMINI_MODEL || 'gemini-3.5-flash';
   const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
@@ -27,7 +32,7 @@ export default async function handler(req, res) {
     const response = await fetch(geminiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req.body),
+      body: JSON.stringify(body),
     });
 
     const data = await response.json();
