@@ -1,10 +1,19 @@
 export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-proxy-secret, x-app-id, x-model');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   const secret = req.headers['x-proxy-secret'];
-  if (!secret || secret !== process.env.PROXY_SECRET) {
+  const validSecrets = [process.env.PROXY_SECRET, process.env.PROXY_SECRET_WEB].filter(Boolean);
+  if (!secret || !validSecrets.includes(secret)) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
