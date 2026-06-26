@@ -28,13 +28,15 @@ export default async function handler(req, res) {
   const body = { ...req.body };
   delete body.userApiKey;
 
-  // thinking 모델 대응: thinkingBudget=0 강제 주입 (토큰 절약 + 응답 잘림 방지)
-  body.generationConfig = {
-    ...(body.generationConfig || {}),
-    thinkingConfig: { thinkingBudget: 0 },
-  };
+  const model = req.headers['x-model'] || process.env.GEMINI_MODEL || 'gemini-2.0-flash';
 
-  const model = req.headers['x-model'] || process.env.GEMINI_MODEL || 'gemini-3.5-flash';
+  // thinking 모델(gemini-2.5-*)에만 thinkingBudget=0 주입 (토큰 절약)
+  if (model.includes('2.5') || model.includes('think')) {
+    body.generationConfig = {
+      ...(body.generationConfig || {}),
+      thinkingConfig: { thinkingBudget: 0 },
+    };
+  }
   const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   try {
