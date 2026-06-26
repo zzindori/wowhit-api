@@ -23,7 +23,22 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'No YouTube API key configured' });
   }
 
-  const { q, maxResults = '10' } = req.query;
+  // 썸네일 프록시 모드 (iOS COEP 대응)
+  const { q, maxResults = '10', thumb } = req.query;
+
+  if (thumb) {
+    try {
+      const thumbRes = await fetch(decodeURIComponent(thumb));
+      const contentType = thumbRes.headers.get('content-type') || 'image/jpeg';
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      const buf = await thumbRes.arrayBuffer();
+      return res.status(200).send(Buffer.from(buf));
+    } catch (error) {
+      return res.status(502).json({ error: 'Thumbnail fetch failed' });
+    }
+  }
+
   if (!q) {
     return res.status(400).json({ error: 'Missing query parameter q' });
   }
