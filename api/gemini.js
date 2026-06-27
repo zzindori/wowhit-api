@@ -29,7 +29,14 @@ export default async function handler(req, res) {
   const body = { ...req.body };
   delete body.userApiKey;
 
-  const model = req.headers['x-model'] || process.env.GEMINI_MODEL || 'gemini-3.5-flash';
+  // 이미지 생성 요청 여부 감지 (responseModalities에 IMAGE 포함)
+  const modalities = body.generationConfig?.responseModalities || [];
+  const isImageGen = Array.isArray(modalities) && modalities.includes('IMAGE');
+
+  const model = req.headers['x-model'] ||
+    (isImageGen
+      ? (process.env.GEMINI_IMAGE_MODEL || process.env.GEMINI_MODEL || 'gemini-3.1-flash-image')
+      : (process.env.GEMINI_MODEL || 'gemini-2.5-flash'));
 
   // thinking 모델(gemini-2.5-*)에만 thinkingBudget=0 주입 (토큰 절약)
   if (model.includes('2.5') || model.includes('think')) {
