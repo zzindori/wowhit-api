@@ -1,7 +1,9 @@
+const VM_URL = 'https://api.wowhit.org';
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-proxy-secret, x-app-id, x-model');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-proxy-secret, x-app-id, x-model, x-codid-token');
   res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
 
   if (req.method === 'OPTIONS') {
@@ -19,17 +21,40 @@ export default async function handler(req, res) {
   }
 
   const appId = (req.headers['x-app-id'] || '').toUpperCase();
+
+  // CODI:D 앱은 반드시 크레딧 토큰 필요 (무료 사용 없음)
+  if (appId === 'CODID') {
+    const codidToken = req.headers['x-codid-token'];
+    if (!codidToken) {
+      return res.status(402).json({ error: '크레딧이 필요합니다', code: 'NO_TOKEN' });
+    }
+    try {
+      const vmRes = await fetch(`${VM_URL}/codid/use`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-vm-secret': process.env.VM_SECRET },
+        body: JSON.stringify({ token: codidToken }),
+      });
+      const vmData = await vmRes.json();
+      if (!vmRes.ok) {
+        const status = vmRes.status === 402 ? 402 : 403;
+        return res.status(status).json({ error: vmData.error || '크레딧 부족', credits: vmData.credits ?? 0, code: 'NO_CREDITS' });
+      }
+      // 응답 헤더에 남은 크레딧 포함
+      res.setHeader('x-codid-credits-remaining', vmData.credits);
+    } catch (e) {
+      return res.status(500).json({ error: '크레딧 서버 오류: ' + e.message });
+    }
+  }
+
   const userApiKey = req.body?.userApiKey;
   const apiKey = userApiKey || process.env[`GEMINI_API_KEY_${appId}`] || process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return res.status(400).json({ error: `No API key for app: ${appId}` });
   }
 
-  // Strip userApiKey from body before forwarding to Gemini
   const body = { ...req.body };
   delete body.userApiKey;
 
-  // 이미지 생성 요청 여부 감지 (responseModalities에 IMAGE 포함)
   const modalities = body.generationConfig?.responseModalities || [];
   const isImageGen = Array.isArray(modalities) && modalities.includes('IMAGE');
 
@@ -38,13 +63,13 @@ export default async function handler(req, res) {
       ? (process.env.GEMINI_IMAGE_MODEL || process.env.GEMINI_MODEL || 'gemini-3.1-flash-image')
       : (process.env.GEMINI_MODEL || 'gemini-2.5-flash'));
 
-  // thinking 모델(gemini-2.5-*)에만 thinkingBudget=0 주입 (토큰 절약)
   if (model.includes('2.5') || model.includes('think')) {
     body.generationConfig = {
       ...(body.generationConfig || {}),
       thinkingConfig: { thinkingBudget: 0 },
     };
   }
+
   const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   try {
