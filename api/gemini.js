@@ -1,4 +1,4 @@
-const VM_URL = 'https://api.wowhit.org';
+const VM_URL = 'http://152.67.208.156:3000';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');

@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 
-const VM_URL = 'https://api.wowhit.org';
+const VM_URL = 'http://152.67.208.156:3000';
 
 // 코드 형식: CODID{credits:2자리}{serial:4자리}{checksum:6자리}
 // 예: CODID10-0001-ABCDEF (10크레딧, 일련번호 0001)
