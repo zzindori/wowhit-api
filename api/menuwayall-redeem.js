@@ -1,8 +1,7 @@
 import crypto from 'crypto';
 
-// 코드 형식: CODID-{serial:4자리}-{checksum:6자리}
-// 예: CODID-0001-ABCDEF → 항상 20크레딧
-const CREDITS_PER_CODE = 20;
+// 코드 형식: MWA{credits:3}{serial:4}{checksum:6}
+// 예: MWA300-0001-ABCDEF → 300크레딧
 const VM_URL = process.env.VM_URL || 'http://152.67.208.156:3000';
 
 export default async function handler(req, res) {
@@ -16,17 +15,17 @@ export default async function handler(req, res) {
   const { code } = req.body || {};
   if (!code) return res.status(400).json({ error: '코드를 입력해주세요' });
 
-  const secret = process.env.CODID_CODE_SECRET;
+  const secret = process.env.MENUWAYALL_CODE_SECRET;
   if (!secret) return res.status(500).json({ error: '서버 설정 오류' });
 
   const normalized = code.trim().toUpperCase().replace(/[-\s]/g, '');
-  const match = normalized.match(/^CODID(\d{4})([A-F0-9]{6})$/);
+  const match = normalized.match(/^MWA(\d{3})(\d{4})([A-F0-9]{6})$/);
   if (!match) return res.status(400).json({ error: '유효하지 않은 코드 형식입니다' });
 
-  const [, serial, checksum] = match;
+  const [, credits, serial, checksum] = match;
   const expected = crypto
     .createHmac('sha256', secret)
-    .update(`CODID:${serial}`)
+    .update(`MENUWAYALL:${credits}:${serial}`)
     .digest('hex')
     .slice(0, 6)
     .toUpperCase();
@@ -36,10 +35,10 @@ export default async function handler(req, res) {
   }
 
   try {
-    const vmRes = await fetch(`${VM_URL}/codid/redeem`, {
+    const vmRes = await fetch(`${VM_URL}/menuwayall/redeem`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-vm-secret': process.env.VM_SECRET },
-      body: JSON.stringify({ code: normalized, credits: CREDITS_PER_CODE }),
+      body: JSON.stringify({ code: normalized, credits: parseInt(credits, 10) }),
     });
     const data = await vmRes.json();
     if (!vmRes.ok) return res.status(400).json({ error: data.error || '이미 사용된 코드입니다' });
